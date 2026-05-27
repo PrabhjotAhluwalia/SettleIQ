@@ -25,6 +25,45 @@ DATA_DIR = os.path.abspath(os.path.join(HERE, "..", "data"))
 DB_PATH = os.path.join(DATA_DIR, "settleiq.db")
 REGISTRY_PATH = os.path.join(DATA_DIR, "DOMAIN_REGISTRY.json")
 
+# Required tables — mirrors skills/_db.py so the router gives the same
+# helpful error message on a fresh clone before seeding.
+_REQUIRED_TABLES = frozenset({
+    "merchant_registry",
+    "settlement_events",
+    "pipeline_logs",
+    "bank_downtime_events",
+    "chargebacks",
+})
+
+
+def _db_is_ready() -> bool:
+    """Return True if the DB file exists and has all required tables."""
+    if not os.path.exists(DB_PATH):
+        return False
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        conn.close()
+        return _REQUIRED_TABLES.issubset(tables)
+    except Exception:
+        return False
+
+
+def _checked_connect() -> sqlite3.Connection:
+    """Open the DB with a clear error if the DB hasn't been seeded."""
+    if not _db_is_ready():
+        raise RuntimeError(
+            f"SettleIQ database not found or incomplete: {DB_PATH}\n"
+            "Run the data generator first:\n"
+            "    python data/mock_generator.py"
+        )
+    return sqlite3.connect(DB_PATH)
+
 ET = ZoneInfo("America/New_York")
 
 
@@ -117,7 +156,7 @@ def resolve_date_range(query: str) -> dict:
 
 def _load_merchant_lookup() -> tuple[dict, dict, list[str]]:
     """Build name->mid, phone->[mids], list of names."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = _checked_connect()
     rows = conn.execute(
         "SELECT mid, business_name, phone_number FROM merchant_registry"
     ).fetchall()
@@ -138,7 +177,7 @@ def fuzzy_match_merchant(query: str) -> dict:
     m = MID_RE.search(query)
     if m:
         mid = m.group(0).upper()
-        conn = sqlite3.connect(DB_PATH)
+        conn = _checked_connect()
         row = conn.execute(
             "SELECT business_name FROM merchant_registry WHERE mid = ?", (mid,)
         ).fetchone()
@@ -189,7 +228,7 @@ def resolve_phone(query: str) -> list[dict]:
     mids = phone_to_mids.get(canonical, [])
     if not mids:
         return []
-    conn = sqlite3.connect(DB_PATH)
+    conn = _checked_connect()
     placeholders = ",".join("?" * len(mids))
     rows = conn.execute(
         f"SELECT mid, business_name FROM merchant_registry WHERE mid IN ({placeholders})",

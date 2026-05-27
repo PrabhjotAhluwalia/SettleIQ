@@ -21,6 +21,77 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+# ---------------------------------------------------------------------------
+# DB readiness guard — auto-seeds if the database is missing or incomplete.
+# This makes `python pipeline_runner.py` work right after a fresh clone
+# even if the user forgot to run `python data/mock_generator.py` first.
+# ---------------------------------------------------------------------------
+_DB_PATH = os.path.join(ROOT, "data", "settleiq.db")
+_REQUIRED_TABLES = frozenset({
+    "merchant_registry",
+    "settlement_events",
+    "pipeline_logs",
+    "bank_downtime_events",
+    "chargebacks",
+})
+
+
+def _db_is_ready() -> bool:
+    """Return True when the database exists and has all required tables."""
+    import sqlite3
+    if not os.path.exists(_DB_PATH):
+        return False
+    try:
+        conn = sqlite3.connect(_DB_PATH)
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        conn.close()
+        return _REQUIRED_TABLES.issubset(tables)
+    except Exception:
+        return False
+
+
+def _ensure_db() -> None:
+    """Auto-seed the database when it is missing or incomplete.
+
+    Runs ``data/mock_generator.py`` as a subprocess so that the working
+    directory and import environment are always correct regardless of where
+    the user invoked pipeline_runner from.
+    """
+    if _db_is_ready():
+        return
+    import subprocess
+    generator = os.path.join(ROOT, "data", "mock_generator.py")
+    print(
+        "[SettleIQ] Database not found or incomplete.\n"
+        "[SettleIQ] Running data/mock_generator.py to seed the database...\n",
+        flush=True,
+    )
+    result = subprocess.run(
+        [sys.executable, generator],
+        cwd=ROOT,
+        capture_output=False,
+    )
+    if result.returncode != 0:
+        print(
+            "[SettleIQ] ERROR: mock_generator.py failed. "
+            "Please run it manually:\n"
+            "    python data/mock_generator.py",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print("[SettleIQ] Database seeded successfully.\n", flush=True)
+
+
+# Run the guard at import time so both CLI usage and Streamlit import both
+# benefit from the check.
+_ensure_db()
+
+
 from agents import classifier as agent_classifier
 from agents import router as agent_router
 from agents import analyst as agent_analyst

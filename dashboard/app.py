@@ -24,7 +24,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from pipeline_runner import run_pipeline  # noqa: E402
+from pipeline_runner import run_pipeline  # noqa: E402  (also triggers DB auto-seed)
 from agents import logger as agent_logger  # noqa: E402
 
 DB_PATH = os.path.join(ROOT, "data", "settleiq.db")

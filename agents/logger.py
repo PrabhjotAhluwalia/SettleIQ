@@ -16,6 +16,43 @@ from datetime import datetime, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.abspath(os.path.join(HERE, "..", "data", "settleiq.db"))
 
+_REQUIRED_TABLES = frozenset({
+    "merchant_registry",
+    "settlement_events",
+    "pipeline_logs",
+    "bank_downtime_events",
+    "chargebacks",
+})
+
+
+def _db_is_ready() -> bool:
+    """Return True if the DB file exists and has all required tables."""
+    if not os.path.exists(DB_PATH):
+        return False
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        conn.close()
+        return _REQUIRED_TABLES.issubset(tables)
+    except Exception:
+        return False
+
+
+def _checked_connect() -> sqlite3.Connection:
+    """Open the DB with a clear error if the DB hasn't been seeded."""
+    if not _db_is_ready():
+        raise RuntimeError(
+            f"SettleIQ database not found or incomplete: {DB_PATH}\n"
+            "Run the data generator first:\n"
+            "    python data/mock_generator.py"
+        )
+    return sqlite3.connect(DB_PATH)
+
 # Pricing: mock cents per 1k chars. Not real - just for the dashboard.
 MOCK_RATE_PER_1K_CHARS = 0.0008
 
@@ -41,7 +78,7 @@ def log_trace(
     latency_ms: int,
 ) -> dict:
     """Insert a row in pipeline_logs and return the persisted record."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = _checked_connect()
     cur = conn.cursor()
     cost = mock_token_cost(final_response)
     rec = {
@@ -78,7 +115,7 @@ def log_trace(
 
 
 def recent_logs(limit: int = 10) -> list[dict]:
-    conn = sqlite3.connect(DB_PATH)
+    conn = _checked_connect()
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
         "SELECT ts, user_email, user_role, query, sanity_status, latency_ms, "
