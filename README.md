@@ -3,15 +3,19 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit](https://img.shields.io/badge/streamlit-1.30%2B-FF4B4B.svg)](https://streamlit.io)
 [![License: see footer](https://img.shields.io/badge/license-see%20footer-lightgrey.svg)](#license)
-[![CI](https://github.com/YOUR_USERNAME/settleiq/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/settleiq/actions/workflows/ci.yml)
+[![CI](https://github.com/PrabhjotAhluwalia/SettleIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/PrabhjotAhluwalia/SettleIQ/actions/workflows/ci.yml)
 
 > **Portfolio prototype.** A central, AI-powered settlement intelligence bot for US payments operations — replacing the manual hop between core banking, DWH/Snowflake, Ops dashboards, and helpdesk tools with a single chat-driven, MCP-style orchestration layer. Roles supported: **Ops · Helpdesk · Risk · Product**.
 
+> **All data is synthetic. No API key required. Runs fully offline.**
+
 ---
 
-## System Description
+## Overview
 
-SettleIQ is a six-agent pipeline that accepts natural language queries about US payments settlement — payout status, failure diagnostics, reserve balances, bank-rail downtime, chargebacks, and merchant config — and returns deterministic, audit-logged, Markdown-formatted responses. The pipeline is fully self-contained (no API keys, no network calls) using SQLite-backed mock data seeded by a reproducible generator. An optional `USE_REAL_LLM` toggle is wired in as an extension point so a real LLM provider (OpenAI, Anthropic) can be plugged in without touching agent logic.
+US payments operations teams spend a large share of their day reconciling settlement across siloed tools: a core banking screen for payout status, a Snowflake/DWH query for trend analysis, an Ops dashboard for reserve balances, a separate console for ACH/Fedwire/RTP rail downtime, and a helpdesk ticket queue for chargebacks. **SettleIQ collapses that workflow into a single chat-driven interface** backed by a six-agent pipeline that classifies the intent, routes it to the right skill, queries the underlying store, validates the result against sanity rules, and returns an audit-logged, Markdown-formatted answer — in milliseconds, deterministically, with no external API calls.
+
+The repo ships with a reproducible SQLite mock of 110 US merchants, 11,000 settlement events, chargebacks, and rail downtime windows so the entire system can be demoed end-to-end on a laptop in three commands. An optional `USE_REAL_LLM` toggle is wired in as an extension point so a real LLM provider (OpenAI, Anthropic) can be plugged into the formatter without touching agent logic.
 
 ---
 
